@@ -478,6 +478,8 @@ header h1 {
 
 /* New Chat Button */
 .new-chat-btn {
+    display: block;
+    width: 100%;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-secondary);
@@ -487,7 +489,6 @@ header h1 {
     background: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    width: 100%;
     text-align: left;
     transition: color 0.2s ease;
 }
