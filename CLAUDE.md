@@ -32,6 +32,10 @@ ANTHROPIC_API_KEY=your_key_here
 
 There is no test suite or linter configured in this project.
 
+## Workflow
+
+**"Save changes"** means: commit all staged files with a subject line ≤150 characters, then push to the current branch.
+
 ## Architecture
 
 This is a RAG (Retrieval-Augmented Generation) chatbot. FastAPI serves both the REST API and the static frontend from a single process on port 8000.
