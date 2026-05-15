@@ -29,10 +29,34 @@ All responses must be:
 Provide only the direct answer to what was asked.
 """
     
+    MOCK_RESPONSE = """*(Mock mode — no API key set)*
+
+Here is an overview of the courses available in this assistant:
+
+### 1. Building Toward Computer Use with Anthropic
+**Instructor:** Colt Steele
+Topics covered: API requests, multimodal image analysis, prompting techniques, tool use, and building computer use agents.
+
+### 2. MCP: Build Rich-Context AI Apps with Anthropic
+**Instructor:** Elie Schoppik
+Topics covered: MCP client-server architecture, building MCP-compatible chatbots, connecting to third-party MCP servers, and remote deployment.
+
+### 3. Advanced Retrieval for AI with Chroma
+**Instructor:** Anton Troynikov
+Topics covered: Query expansion, cross-encoder reranking, embedding adaptation, and cutting-edge RAG techniques.
+
+### 4. Prompt Compression and Query Optimization
+**Instructor:** Richmond Alake
+Topics covered: Pre- and post-filtering, projection, reranking, and prompt compression to reduce LLM serving costs.
+
+> Add `ANTHROPIC_API_KEY` to your `.env` file to enable real AI responses tailored to your query."""
+
     def __init__(self, api_key: str, model: str):
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.mock_mode = not api_key
+        if not self.mock_mode:
+            self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
-        
+
         # Pre-build base API parameters
         self.base_params = {
             "model": self.model,
@@ -76,6 +100,9 @@ Provide only the direct answer to what was asked.
             api_params["tools"] = tools
             api_params["tool_choice"] = {"type": "auto"}
         
+        if self.mock_mode:
+            return self.MOCK_RESPONSE
+
         # Get response from Claude
         response = self.client.messages.create(**api_params)
         

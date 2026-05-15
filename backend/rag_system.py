@@ -15,7 +15,7 @@ class RAGSystem:
         
         # Initialize core components
         self.document_processor = DocumentProcessor(config.CHUNK_SIZE, config.CHUNK_OVERLAP)
-        self.vector_store = VectorStore(config.CHROMA_PATH, config.EMBEDDING_MODEL, config.MAX_RESULTS)
+        self.vector_store = VectorStore(config.CHROMA_PATH, config.EMBEDDING_MODEL, config.MAX_RESULTS, mock_mode=config.MOCK_MODE)
         self.ai_generator = AIGenerator(config.ANTHROPIC_API_KEY, config.ANTHROPIC_MODEL)
         self.session_manager = SessionManager(config.MAX_HISTORY)
         
@@ -126,8 +126,17 @@ class RAGSystem:
             tool_manager=self.tool_manager
         )
         
-        # Get sources from the search tool
-        sources = self.tool_manager.get_last_sources()
+        # Get sources from the search tool (use mock sources when no API key is set)
+        if self.config.MOCK_MODE:
+            sources = [
+                {"label": "MCP: Build Rich-Context AI Apps with Anthropic - Lesson 5", "link": "https://learn.deeplearning.ai/courses/mcp-build-rich-context-ai-apps-with-anthropic/lesson/pnd5n/creating-an-mcp-client"},
+                {"label": "MCP: Build Rich-Context AI Apps with Anthropic - Lesson 0", "link": "https://learn.deeplearning.ai/courses/mcp-build-rich-context-ai-apps-with-anthropic/lesson/fkbhh/introduction"},
+                {"label": "MCP: Build Rich-Context AI Apps with Anthropic - Lesson 7", "link": "https://learn.deeplearning.ai/courses/mcp-build-rich-context-ai-apps-with-anthropic/lesson/f2uk7/adding-prompt-and-resource-features"},
+                {"label": "MCP: Build Rich-Context AI Apps with Anthropic - Lesson 2", "link": "https://learn.deeplearning.ai/courses/mcp-build-rich-context-ai-apps-with-anthropic/lesson/xtt6w/mcp-architecture"},
+                {"label": "MCP: Build Rich-Context AI Apps with Anthropic - Lesson 3", "link": "https://learn.deeplearning.ai/courses/mcp-build-rich-context-ai-apps-with-anthropic/lesson/hg6oi/chatbot-example"},
+            ]
+        else:
+            sources = self.tool_manager.get_last_sources()
 
         # Reset sources after retrieving them
         self.tool_manager.reset_sources()

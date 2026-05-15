@@ -5,6 +5,15 @@ from dataclasses import dataclass
 from models import Course, CourseChunk
 from sentence_transformers import SentenceTransformer
 
+
+class MockEmbeddingFunction:
+    """Returns fixed-size zero vectors — no model download needed."""
+    def name(self) -> str:
+        return "default"  # tells ChromaDB to skip the persisted-config conflict check
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        return [[0.0] * 384 for _ in input]
+
 @dataclass
 class SearchResults:
     """Container for search results with metadata"""
@@ -34,18 +43,21 @@ class SearchResults:
 class VectorStore:
     """Vector storage using ChromaDB for course content and metadata"""
     
-    def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5):
+    def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5, mock_mode: bool = False):
         self.max_results = max_results
         # Initialize ChromaDB client
         self.client = chromadb.PersistentClient(
             path=chroma_path,
             settings=Settings(anonymized_telemetry=False)
         )
-        
-        # Set up sentence transformer embedding function
-        self.embedding_function = chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=embedding_model
-        )
+
+        # Use mock embeddings when no API key is set to avoid network calls
+        if mock_mode:
+            self.embedding_function = MockEmbeddingFunction()
+        else:
+            self.embedding_function = chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=embedding_model
+            )
         
         # Create collections for different types of data
         self.course_catalog = self._create_collection("course_catalog")  # Course titles/instructors
