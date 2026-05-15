@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\NikitaSietsema\\\\Documents\\\\Git\\\\LinkedInLearning\\\\Claude Code Demo\\\\starting-ragchatbot-codebase\")",
+      "Bash(Select-Object -Property Name, PSIsContainer)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\NikitaSietsema\\\\Documents\\\\Git\\\\LinkedInLearning\\\\Claude Code Demo\\\\starting-ragchatbot-codebase\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(bash ./run.sh)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add CLAUDE.md with uv guidance and Claude Code settings *)",
+      "Bash(git push *)"
+    ]
+  }
+}
