@@ -1,0 +1,4 @@
+node_modules/
+chroma_db/
+*.lock
+uv.lock
