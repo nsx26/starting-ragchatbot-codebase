@@ -90,6 +90,28 @@ def test_real_mode_passes_tools_to_api():
 
 
 # ---------------------------------------------------------------------------
+# 4b. Real mode single tool use: follow-up call does NOT include tools
+#     (this was the original bug — tools were stripped; with the new code the
+#     follow-up can still include tools when rounds_remaining > 0, but for a
+#     1-round sequence the follow-up response is end_turn so tools ARE present
+#     in that call's params. Verify tools are present in the 2nd call.)
+# ---------------------------------------------------------------------------
+
+def test_real_mode_single_tool_use_second_call_includes_tools():
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        client.messages.create.side_effect = [
+            _tool_use_response("search_course_content", "id_001", {"query": "RAG"}),
+            _text_response("RAG answer."),
+        ]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        gen.generate_response("Explain RAG", tools=tools, tool_manager=MagicMock())
+        second_call_kwargs = client.messages.create.call_args_list[1][1]
+        assert "tools" in second_call_kwargs
+
+
+# ---------------------------------------------------------------------------
 # 5. Real mode tool_use: execute_tool called with correct name + input
 # ---------------------------------------------------------------------------
 
@@ -161,3 +183,113 @@ def test_real_mode_tool_use_returns_synthesized_final_text():
         tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
         result = gen.generate_response("What are embeddings?", tools=tools, tool_manager=tm)
     assert result == final_text
+
+
+# ---------------------------------------------------------------------------
+# 9. Two-round path: 3 API calls total, execute_tool called twice
+# ---------------------------------------------------------------------------
+
+def test_two_round_tool_use_makes_three_api_calls():
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        client.messages.create.side_effect = [
+            _tool_use_response("search_course_content", "id_010", {"query": "lesson 4"}),
+            _tool_use_response("search_course_content", "id_011", {"query": "topic X"}),
+            _text_response("Final answer."),
+        ]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tm = MagicMock()
+        tm.execute_tool.return_value = "result"
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        gen.generate_response("Find course covering same topic as lesson 4", tools=tools, tool_manager=tm)
+    assert client.messages.create.call_count == 3
+    assert tm.execute_tool.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# 10. Two-round path: returns the THIRD response's text
+# ---------------------------------------------------------------------------
+
+def test_two_round_tool_use_returns_third_response_text():
+    final_text = "Answer synthesized from two searches."
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        client.messages.create.side_effect = [
+            _tool_use_response("search_course_content", "id_020", {"query": "first"}),
+            _tool_use_response("search_course_content", "id_021", {"query": "second"}),
+            _text_response(final_text),
+        ]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tm = MagicMock()
+        tm.execute_tool.return_value = "data"
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        result = gen.generate_response("Multi-part question", tools=tools, tool_manager=tm)
+    assert result == final_text
+
+
+# ---------------------------------------------------------------------------
+# 11. Two-round path: tools present in call 2, absent in forced-final call 3
+# ---------------------------------------------------------------------------
+
+def test_two_round_tools_present_in_round2_absent_in_final():
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        client.messages.create.side_effect = [
+            _tool_use_response("search_course_content", "id_030", {"query": "a"}),
+            _tool_use_response("search_course_content", "id_031", {"query": "b"}),
+            _text_response("Done."),
+        ]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        gen.generate_response("Question", tools=tools, tool_manager=MagicMock())
+        call_kwargs = [call[1] for call in client.messages.create.call_args_list]
+        assert "tools" in call_kwargs[1]   # round-2 call still has tools
+        assert "tools" not in call_kwargs[2]  # forced-final call has no tools
+
+
+# ---------------------------------------------------------------------------
+# 12. Two-round path: each round's execute_tool called with distinct inputs
+# ---------------------------------------------------------------------------
+
+def test_two_round_execute_tool_called_with_distinct_inputs():
+    input_1 = {"query": "lesson 4 title"}
+    input_2 = {"query": "advanced Python"}
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        client.messages.create.side_effect = [
+            _tool_use_response("search_course_content", "id_040", input_1),
+            _tool_use_response("search_course_content", "id_041", input_2),
+            _text_response("Answer."),
+        ]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tm = MagicMock()
+        tm.execute_tool.return_value = "result"
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        gen.generate_response("Complex question", tools=tools, tool_manager=tm)
+    assert tm.execute_tool.call_args_list[0] == (("search_course_content",), input_1)
+    assert tm.execute_tool.call_args_list[1] == (("search_course_content",), input_2)
+
+
+# ---------------------------------------------------------------------------
+# 13. Two-round path: full message history passed to the third API call
+# ---------------------------------------------------------------------------
+
+def test_two_round_message_history_accumulated_correctly():
+    with patch("ai_generator.anthropic.Anthropic") as MockA:
+        client = MockA.return_value
+        r1 = _tool_use_response("search_course_content", "id_050", {"query": "a"})
+        r2 = _tool_use_response("search_course_content", "id_051", {"query": "b"})
+        client.messages.create.side_effect = [r1, r2, _text_response("Done.")]
+        gen = AIGenerator(api_key="sk-test", model="claude-sonnet-4-20250514")
+        tm = MagicMock()
+        tm.execute_tool.return_value = "chunk"
+        tools = [{"name": "search_course_content", "description": "...", "input_schema": {}}]
+        gen.generate_response("Question", tools=tools, tool_manager=tm)
+        third_call_messages = client.messages.create.call_args_list[2][1]["messages"]
+    # user + assistant(r1) + tool_results(r1) + assistant(r2) + tool_results(r2) = 5
+    assert len(third_call_messages) == 5
+    assert third_call_messages[0]["role"] == "user"
+    assert third_call_messages[1]["role"] == "assistant"
+    assert third_call_messages[2]["role"] == "user"
+    assert third_call_messages[3]["role"] == "assistant"
+    assert third_call_messages[4]["role"] == "user"
